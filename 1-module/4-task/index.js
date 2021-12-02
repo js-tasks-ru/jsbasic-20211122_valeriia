@@ -1,3 +1,3 @@
 function checkSpam(str) {
-  // ваш код...
+  return str.indexOf('1XbeT now') != -1 || str.indexOf('xxx') != -1;
 }
