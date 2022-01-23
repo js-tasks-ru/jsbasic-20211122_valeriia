@@ -13,23 +13,19 @@ export default class Cart {
   }
 
   addProduct(product) {
-    if (product && this.cartItems) {
-      if(this.cartItems.length > 0 && product){
-        for (const cardItem of this.cartItems) {
-          if (cardItem.product.id === product.id) {
-            cardItem.count++;
-            this.onProductUpdate(cardItem);
-            return;
-          }
+    if (product == null) { return; }
+    if(this.cartItems.length > 0 && product){
+      for(let item of this.cartItems){
+        if( item.product.id === product.id){
+          item.count++;
+          this.onProductUpdate(item);
+          return;
         }
       }
-      const newItem = {
-        product,
-        count: 1,
-      };
-      this.cartItems.push(newItem);
-      this.onProductUpdate(newItem);
     }
+    const newItem = { product, count: 1,}; 
+    this.cartItems.push(newItem);
+    this.onProductUpdate(newItem);
   }
 
   updateProductCount(productId, amount) {
@@ -37,9 +33,10 @@ export default class Cart {
     let cartItem = this.cartItems[elem]
     cartItem.count += amount;
 
-    if (this.cartItems.length == 1 && cartItem.count < 1) {
-      this.cartItems = [];
+    if(cartItem.count == 0){
+      this.cartItems.splice(elem,1);
     }
+
     this.onProductUpdate(cartItem);
   }
 
@@ -114,79 +111,81 @@ export default class Cart {
 
   renderModal() {
     this.modal = new Modal();
-    this.modal.setTitle("Your order");
-    this.modalBody = document.createElement('div');
-
-    for (let { product, count } of this.cartItems) {
-      this.modalBody.append(this.renderProduct(product, count));
+    this.modal.setTitle('Your order');
+    this.modal_body = createElement('<div></div>');
+    
+    for(let item of this.cartItems){
+      let product = this.renderProduct(item.product, item.count);
+      this.modal_body.append(product);
     }
 
-    this.modalBody.append(this.renderOrderForm());
-    this.modalBody.addEventListener('click', this.onModalBodyClickHandler);
-    this.modalBody.querySelector('form').onsubmit = (event) => this.onSubmit(event);
-    this.modal.setBody(this.modalBody);
+    this.modal_body.append(this.renderOrderForm());
+    this.modal.setBody(this.modal_body);
+    this.modal_body.addEventListener('click', this.handleClick);
+    this.modal_body.querySelector('form').onsubmit = (event) => this.onSubmit(event);
 
     this.modal.elem.addEventListener('modal-close', () => {
-      this.modalBody = null;
       this.modal = null;
+      this.modalBody = null;
     });
-
+    
     this.modal.open();
   }
 
-  onProductUpdate(cartItem) {
-    this.cartIcon.update(this);
-
-    if (!this.modal || !document.body.classList.contains('is-modal-open')) {
-      return;
-    }
-
-    if (this.cartItems.length === 0 || !this.cartItems.length) {
-      this.modal.close();
-      return;
-    }
-
-    if (count == 0) {
-      this.modalBody.querySelector(`[data-product-id="${product.id}"]`).remove();
-    } else {
-      this.modalBody.querySelector(`[data-product-id="${product.id}"] .cart-counter__count`).innerHTML = count;
-      this.modalBody.querySelector(`[data-product-id="${product.id}"] .cart-product__price`).innerHTML = '€' + (count * product.price).toFixed(2);
-    }
-
-    this.modalBody.querySelector(`.cart-buttons__info-price`).innerHTML = '€' + this.getTotalPrice().toFixed(2);
-
-    this.cartIcon.update(this);
+  handleClick = (event) => {
+    if(event.target.closest('.cart-counter__button')) {
+    let productId = event.target.closest('.cart-product').dataset.productId;
+    let count = event.target.closest(".cart-counter__button_plus") ? 1 : -1;
+    this.updateProductCount(productId, count) ;
+    };
   }
 
-  onSubmit(event) {
+  onProductUpdate(cartItem) {
+    this.cartIcon.update(this); 
+
+    if (!document.body.classList.contains('is-modal-open')){ return }
+
+    if (this.cartItems.length == 0) { 
+      this.modal.close();
+    
+      return;
+    }
+
+    if (cartItem.count == 0) { 
+      this.modal_body.querySelector(`[data-product-id="${cartItem.product.id}"]`).remove();
+    }
+    else {
+      let productId = cartItem.product.id;
+      let productCount = this.modal_body.querySelector(`[data-product-id="${productId}"] .cart-counter__count`);
+
+      let productPrice = this.modal_body.querySelector(`[data-product-id="${productId}"] .cart-product__price`);
+      productCount.textContent = cartItem.count;
+      productPrice.textContent = `€${(cartItem.count * cartItem.product.price).toFixed(2)}`;
+    }
+    
+    let infoPrice = this.modal_body.querySelector(`.cart-buttons__info-price`);
+    infoPrice.textContent = `€${this.getTotalPrice().toFixed(2)}`;
+}
+
+  async onSubmit(event) {
     event.preventDefault();
+    this.modal_body.querySelector('button[type="submit"]').classList.add("is-loading");
+    let newformData = new FormData(document.querySelector('.cart-form'));
 
-    this.modalBody
-      .querySelector('button[type="submit"]')
-      .classList.add("is-loading");
-    let form = this.modalBody.querySelector('.cart-form');
-    let userData = new FormData(form);
+    const response = await fetch('https://httpbin.org/post', { method: 'POST', body: newformData});
 
-    await fetch('https://httpbin.org/post', { method: 'POST', body: userData });
-
-    this.modal.setTitle("Success!");
-    this.modalBody
-      .querySelector('button[type="submit"]')
-      .classList.remove("is-loading");
-
-    this.cartItems = [];
-    this.cartIcon.update(this);
-
-    this.modalBody.innerHTML = (`
-      <div class="modal__body-inner">
-        <p>
-          Order successful! Your order is being cooked :) <br>
-          We’ll notify you about delivery time shortly.<br>
-          <img src="/assets/images/delivery.gif">
-        </p>
-      </div>
-      `);
-  };
+    if(response.status == '200'){
+      this.cartItems = [];
+      this.modal.setTitle('Success!');
+      this.modal_body.innerHTML = `<div class="modal__body-inner">
+      <p>
+        Order successful! Your order is being cooked :) <br>
+        We’ll notify you about delivery time shortly.<br>
+        <img src="/assets/images/delivery.gif">
+      </p>
+    </div>`;
+      }
+  }
 
   addEventListeners() {
     this.cartIcon.elem.onclick = () => this.renderModal();
