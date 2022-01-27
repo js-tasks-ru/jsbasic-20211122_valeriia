@@ -5,54 +5,36 @@ export default class ProductGrid {
   constructor(products) {
     this.products = products;
     this.filters = {};
-  }
-
-  get elem() {
-    return this.render();
+    this.render();
   }
 
   render() {
-    let filteredProducts = this.updateFilter(this.filters);
-    const elem = createElement(`
-      <div class="products-grid">
-        <div class="products-grid__inner">
-        </div>
-      </div>
-  `);
-    const list = elem.querySelector(".products-grid__inner");
-    for (const p of filteredProducts) {
-      const card = new ProductCard(p).elem;
-      list.append(card);
+    this.elem = createElement(`<div class="products-grid">
+      <div class="products-grid__inner"></div>
+    </div>`);
+
+    this.renderContent();
+  }
+
+  renderContent() {
+    this.elem.querySelector('.products-grid__inner').innerHTML = '';
+
+    for (let product of this.products) {
+      if (this.filters.noNuts && product.nuts) {continue;}
+      if (this.filters.vegeterianOnly && !product.vegeterian) {continue;}
+      if (this.filters.maxSpiciness !== undefined && product.spiciness > this.filters.maxSpiciness) {
+        continue;
+      }
+      if (this.filters.category && product.category != this.filters.category) {
+        continue;
+      }
+      let card = new ProductCard(product);
+      this.elem.querySelector('.products-grid__inner').append(card.elem);
     }
-    return elem;
   }
 
   updateFilter(filters) {
-    for (const key in filters) {
-      this.filters[key] = filters[key];
-    }
-
-    if (Object.keys(filters).length == 0) {
-      return this.products;
-    } else {
-      let products = this.products;
-      if (this.filters.noNuts) {
-        products = this.products.filter((p) => !p.nuts);
-      }
-
-      if (this.filters.vegeterianOnly) {
-        products = products.filter((p) => p.vegeterian);
-      }
-
-      if (this.filters.maxSpiciness) {
-        products = products.filter((p) => p.spiciness <= this.filters.maxSpiciness);
-      }
-
-      if (this.filters.category) {
-        products = products.filter((p) => p.category === this.filters.category);
-      }
-
-      return products;
-    }
+    Object.assign(this.filters, filters);
+    this.renderContent();
   }
 }
